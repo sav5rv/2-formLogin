@@ -1,0 +1,256 @@
+quero um exemplo de um codigo para criar formulario de login e senha para controle de acesso, com opções esqueci a senha e trocar a senha, usando javascript para validar os dados dos campos nas opções esqueci a senha, trocar a senha, usar o nodejs para acessar gerenciar os dados no banco de dados mongodb e para salvar os dados dos usuarios na tabela usuarios, e na tabela login registrar todos os acessos tentados e realizados através desse formulario 
+O ChatGPT disse:
+
+Aqui está um exemplo de implementação para atender à sua solicitação. Este exemplo utiliza HTML, CSS, JavaScript para o front-end, e Node.js com Express e MongoDB para o back-end.
+
+Estrutura do Projeto
+java
+Copiar código
+project/
+│
+├── server.js
+├── package.json
+├── public/
+│   ├── index.html
+│   ├── style.css
+│   ├── script.js
+├── routes/
+│   ├── userRoutes.js
+├── models/
+│   ├── User.js
+│   ├── LoginAttempt.js
+
+
+1. Front-end
+index.html
+html
+Copiar código
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <title>Login Form</title>
+</head>
+<body>
+  <div class="form-container">
+    <h2>Login</h2>
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+    <p><a href="#" id="forgotPassword">Esqueci a senha</a> | <a href="#" id="changePassword">Trocar a senha</a></p>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
+
+
+style.css
+css
+Copiar código
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  background-color: #f4f4f4;
+}
+
+.form-container {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+input {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  width: 80%;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  background: #007BFF;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+  color: #007BFF;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+
+script.js
+javascript
+Copiar código
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const response = await fetch("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const result = await response.json();
+  alert(result.message);
+});
+
+document.getElementById("forgotPassword").addEventListener("click", async () => {
+  const email = prompt("Digite seu email:");
+  const response = await fetch("/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const result = await response.json();
+  alert(result.message);
+});
+
+document.getElementById("changePassword").addEventListener("click", async () => {
+  const email = prompt("Digite seu email:");
+  const newPassword = prompt("Digite sua nova senha:");
+  const response = await fetch("/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, newPassword }),
+  });
+
+  const result = await response.json();
+  alert(result.message);
+});
+
+
+2. Back-end
+server.js
+javascript
+Copiar código
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const userRoutes = require("./routes/userRoutes");
+
+const app = express();
+const PORT = 3000;
+
+app.use(bodyParser.json());
+app.use(express.static("public"));
+app.use(userRoutes);
+
+mongoose
+  .connect("mongodb://localhost:27017/authentication", { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB connection error:", err));
+
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+routes/userRoutes.js
+javascript
+Copiar código
+const express = require("express");
+const User = require("../models/User");
+const LoginAttempt = require("../models/LoginAttempt");
+const router = express.Router();
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email });
+  const success = user && user.password === password;
+
+  await LoginAttempt.create({ email, success, timestamp: new Date() });
+
+  if (success) {
+    res.json({ message: "Login bem-sucedido!" });
+  } else {
+    res.json({ message: "Email ou senha incorretos." });
+  }
+});
+
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (user) {
+    res.json({ message: "Um link para redefinir sua senha foi enviado ao seu email." });
+  } else {
+    res.json({ message: "Email não encontrado." });
+  }
+});
+
+router.post("/change-password", async (req, res) => {
+  const { email, newPassword } = req.body;
+
+  const user = await User.findOne({ email });
+  if (user) {
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: "Senha alterada com sucesso!" });
+  } else {
+    res.json({ message: "Email não encontrado." });
+  }
+});
+
+module.exports = router;
+models/User.js
+javascript
+Copiar código
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+});
+
+module.exports = mongoose.model("User", userSchema);
+models/LoginAttempt.js
+javascript
+Copiar código
+const mongoose = require("mongoose");
+
+const loginAttemptSchema = new mongoose.Schema({
+  email: { type: String, required: true },
+  success: { type: Boolean, required: true },
+  timestamp: { type: Date, required: true },
+});
+
+module.exports = mongoose.model("LoginAttempt", loginAttemptSchema);
+3. Instruções
+Instale as dependências no terminal:
+bash
+Copiar código
+npm install express mongoose body-parser
+Inicie o servidor:
+bash
+Copiar código
+node server.js
+Acesse http://localhost:3000 no navegador.
+Próximos Passos
+a. Adicionar validação de senha forte e hashes com bcrypt.
+b. Implementar autenticação JWT para proteger rotas privadas.
+
+
+
+
+
